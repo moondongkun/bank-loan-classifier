@@ -1,100 +1,89 @@
-# 🏦 Personal Loan Approval Prediction (AI Final Project)
+# Bank Personal Loan Classifier
 
-This project predicts whether a customer is likely to be approved for a personal loan using real-world financial data. We build and compare four classification models, address class imbalance, and use t-SNE to visualize high-dimensional customer profiles.
+Which bank customers will accept a personal loan offer? Only about 9% do, so this
+is an imbalanced binary classification problem. The notebook compares two Naive
+Bayes variants, an elastic-net logistic regression and XGBoost, with feature
+selection driven by drop-column importance and model selection driven by F1 on
+the minority class.
 
----
+![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)
+![scikit-learn](https://img.shields.io/badge/scikit--learn-F7931E?logo=scikitlearn&logoColor=white)
+![XGBoost](https://img.shields.io/badge/XGBoost-1A73E8)
+![Jupyter](https://img.shields.io/badge/Jupyter-F37626?logo=jupyter&logoColor=white)
 
-## 📁 Project Structure
+## Results
 
-```
-loan-approval-prediction-AI/
-│
-├── Bank_Personal_Loan_Modelling.xlsx       # Original dataset
-├── imbalanced-personal-bank-loan-classification.ipynb  # Main analysis notebook
-├── results/
-│   └── tsne_loan_projection.png            # t-SNE visualization of customer data
-├── README.md                               # This file
-```
+Held-out test set: 979 customers (87 positives), stratified 80/20 split.
+Metrics are for the positive class (loan accepted).
 
----
+| Model | Accuracy | Precision | Recall | F1 | ROC AUC |
+|---|---:|---:|---:|---:|---:|
+| **XGBoost** | **98.98%** | **96.39%** | 91.95% | **94.12%** | **99.85%** |
+| Logistic Regression (elastic net) | 94.79% | 72.50% | 66.67% | 69.46% | 95.96% |
+| Bernoulli Naive Bayes | 93.87% | 72.13% | 50.57% | 59.46% | 94.51% |
+| Complement Naive Bayes | 86.01% | 38.32% | **94.25%** | 54.49% | 93.27% |
 
-## 🚀 Getting Started
+XGBoost misclassifies 10 of 979 test customers (7 missed acceptors, 3 false
+alarms). Complement NB has the highest recall but flags many non-acceptors,
+which makes it a reasonable choice only if missing a likely customer costs far
+more than contacting an uninterested one.
 
-### ✅ Clone the repository
+<p align="center">
+  <img src="results/xgboost_evaluation.png" width="820" alt="XGBoost confusion matrix and ROC curve">
+</p>
+
+## What drives acceptance
+
+Drop-column importance (the F1 lost when a feature is removed and the model is
+refit under 5-fold CV) for XGBoost:
+
+<p align="center">
+  <img src="results/xgboost_drop_column_importance.png" width="560" alt="Drop-column feature importance">
+</p>
+
+Education, income and family size dominate; credit-card spending (`CCAvg`) and
+holding a CD account add a little more. Age, mortgage, ZIP code and credit-card
+ownership contribute nothing once the others are known.
+
+A t-SNE projection of the standardised features shows that acceptors cluster in
+a few distinct regions rather than spreading across the customer base:
+
+<p align="center">
+  <img src="results/tsne_loan_projection.png" width="620" alt="t-SNE projection of customers by loan acceptance">
+</p>
+
+## Pipeline
+
+1. **Cleaning**: negative `Experience` values (52 rows) made absolute; 105 mortgage outliers (z > 3) and one invalid ZIP code removed; `Experience` dropped as redundant with `Age` (Spearman ρ ≈ 0.99).
+2. **Naive Bayes models**: continuous features discretised with `KBinsDiscretizer`; bin count and strategy chosen by grid search, then one-hot encoded.
+3. **Logistic regression**: standardised features; grid search over solver, penalty (none / L1 / L2 / elastic net), `C` and class weights.
+4. **XGBoost**: features with drop-column importance below 0.002 removed, then refit with `max_depth = 4` and `scale_pos_weight = 1.5`.
+5. **Selection metric**: F1 on the positive class, using stratified 5-fold CV throughout.
+
+## Running it
 
 ```bash
-git clone https://github.com/moondongkun/loan-approval-prediction-AI.git
-cd loan-approval-prediction-AI
+pip install -r requirements.txt
+jupyter notebook imbalanced-personal-bank-loan-classification.ipynb
 ```
 
-### ✅ Install dependencies
+The dataset (`Bank_Personal_Loan_Modelling.xlsx`, 5,000 customers, 14 columns)
+is included in the repository.
 
-You can either use `requirements.txt` (if added), or install packages manually:
+## Project structure
 
-```bash
-pip install pandas numpy matplotlib seaborn scikit-learn xgboost openpyxl
+```
+├── imbalanced-personal-bank-loan-classification.ipynb   # full analysis (comments in Korean)
+├── Bank_Personal_Loan_Modelling.xlsx                    # dataset
+├── results/                                             # figures exported from the notebook
+└── requirements.txt
 ```
 
----
+## Context
 
-## 📊 Models Compared
+Final project for an AI course at Seoul National University (2025).
 
-- **Complement Naive Bayes (CNB)**
-- **Bernoulli Naive Bayes (BNB)**
-- **Logistic Regression** (with elastic net regularization)
-- **XGBoost** (best performance)
+## License
 
-### Evaluation Metrics:
-- **F1 Score**, **Recall**, **Precision**, and **AUC**
-
----
-
-## 🔍 Feature Engineering & Preprocessing
-
-- Handled outliers (negative experience, extreme mortgage)
-- Performed binning, scaling, and feature selection
-- Used **Drop-Column importance** to rank features
-
-📌 Key predictors:
-- `Education`, `Income`, `Family`, `CCAvg`, `CD Account`
-
----
-
-## 🌐 Visualizations
-
-- Generated a 2D **t-SNE projection** of customer feature space
-- Visualized class separability between loan-approved and rejected profiles
-
-![t-SNE](results/tsne_loan_projection.png)
-
----
-
-## ✅ Results
-
-| Model | F1 Score | Recall | Precision | AUC    |
-|-------|----------|--------|-----------|--------|
-| CNB   | 0.54     | 0.94   | 0.38      | 0.73   |
-| BNB   | 0.59     | 0.88   | 0.45      | 0.73   |
-| LR    | 0.69     | 0.83   | 0.59      | 0.79   |
-| **XGB** | **0.94** | **0.95** | **0.93** | **0.96** |
-
----
-
-## 📌 Purpose
-
-- Demonstrate real-world application of machine learning to financial decision-making
-- Explore interpretability, feature importance, and data imbalance handling
-- Completed as part of AI course final project at **Seoul National University**
-
----
-
-## 🧑‍💻 Author
-
-**문동건**  
-Seoul National University, 자유전공학부 (AI Final Project, 2025)
-
----
-
-## 📝 License
-
-This repository is provided for academic purposes. No official license applied.
+Code is released under the [MIT License](LICENSE). The dataset is a widely used
+public teaching dataset and remains subject to its original terms.
